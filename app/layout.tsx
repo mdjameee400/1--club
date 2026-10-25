@@ -10,6 +10,7 @@ import { PackProvider } from "@/components/PackProvider";
 import SmoothScroll from "@/components/SmoothScroll";
 import RevealController from "@/components/RevealController";
 import OrderDrawer from "@/components/OrderDrawer";
+import MobileDock from "@/components/MobileDock";
 
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </noscript>
         <PackProvider>
           {children}
+          <MobileDock />
           <OrderDrawer />
         </PackProvider>
         <SmoothScroll />

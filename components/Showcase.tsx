@@ -88,13 +88,29 @@ export default function Showcase() {
     // Touch / small screens / reduced motion: native snap carousel
     mm.add("(max-width: 1023.98px), (prefers-reduced-motion: reduce)", () => {
       let raf = 0;
+      const panels = Array.from(t.querySelectorAll<HTMLElement>("[data-panel]"));
       const onScroll = () => {
         cancelAnimationFrame(raf);
         raf = requestAnimationFrame(() => {
+          // nearest panel to the visible centre becomes active
+          const centre = t.scrollLeft + t.clientWidth / 2;
+          let best = 0;
+          let dist = Infinity;
+          panels.forEach((p, i) => {
+            const d = Math.abs(p.offsetLeft + p.offsetWidth / 2 - centre);
+            if (d < dist) {
+              dist = d;
+              best = i;
+            }
+          });
+          setActive(best);
           const max = t.scrollWidth - t.clientWidth;
-          setProgress(max > 0 ? t.scrollLeft / max : 0);
+          if (bar.current) {
+            bar.current.style.transform = `scaleX(${max > 0 ? t.scrollLeft / max : 0})`;
+          }
         });
       };
+      onScroll();
       t.addEventListener("scroll", onScroll, { passive: true });
       return () => {
         cancelAnimationFrame(raf);
@@ -107,6 +123,17 @@ export default function Showcase() {
 
   const current = Math.max(active, 1);
 
+  // Mobile: jump to a panel when its dot is tapped
+  const goTo = (i: number) => {
+    const t = track.current;
+    const panel = t?.querySelectorAll<HTMLElement>("[data-panel]")[i];
+    if (!t || !panel) return;
+    t.scrollTo({
+      left: panel.offsetLeft - (t.clientWidth - panel.clientWidth) / 2,
+      behavior: "smooth",
+    });
+  };
+
   return (
     <section
       ref={section}
@@ -116,7 +143,7 @@ export default function Showcase() {
     >
       <div
         ref={track}
-        className="no-scrollbar flex snap-x snap-mandatory items-center gap-[6vw] overflow-x-auto px-[8vw] will-change-transform lg:h-full lg:snap-none lg:gap-[5vw] lg:px-[7vw]"
+        className="no-scrollbar relative flex snap-x snap-mandatory items-center gap-[6vw] overflow-x-auto px-[8vw] will-change-transform lg:h-full lg:snap-none lg:gap-[5vw] lg:px-[7vw]"
       >
         {/* intro panel */}
         <div
@@ -140,13 +167,16 @@ export default function Showcase() {
           </p>
         </div>
 
-        {flavors.map((f) => {
+        {flavors.map((f, idx) => {
           const qty = counts[f.id] ?? 0;
+          const isActive = active === idx + 1;
           return (
             <article
               key={f.id}
               data-panel
-              className="group flex w-[84vw] shrink-0 snap-center flex-col items-center gap-8 sm:w-[70vw] lg:w-[min(60vw,900px)] lg:flex-row lg:gap-[5vw]"
+              className={`group flex w-[84vw] shrink-0 snap-center flex-col items-center gap-7 transition-[opacity,transform] duration-500 ease-[cubic-bezier(.2,.7,.2,1)] sm:w-[70vw] sm:gap-8 lg:w-[min(60vw,900px)] lg:flex-row lg:gap-[5vw] ${
+                isActive ? "" : "max-lg:scale-[0.92] max-lg:opacity-45"
+              }`}
             >
               <div
                 data-bottle
@@ -208,7 +238,7 @@ export default function Showcase() {
                   <button
                     type="button"
                     onClick={() => add(f.id)}
-                    className="btn btn-dark !px-5 !py-3"
+                    className="btn btn-dark !px-6 !py-3.5 active:scale-95"
                     aria-label={`Add ${f.name} to your pack`}
                   >
                     <Plus size={15} />
@@ -220,6 +250,33 @@ export default function Showcase() {
           );
         })}
         <div className="w-[2vw] shrink-0 lg:w-[4vw]" aria-hidden />
+      </div>
+
+      {/* mobile pager dots */}
+      <div className="mt-8 flex items-center justify-center lg:hidden" role="tablist" aria-label="Choose a drink">
+        {tints.map((_, i) => {
+          const on = active === i;
+          const color = i === 0 ? "#1F1A17" : flavors[i - 1].accent;
+          return (
+            <button
+              key={i}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              aria-label={i === 0 ? "Intro" : flavors[i - 1].name}
+              onClick={() => goTo(i)}
+              className="grid h-11 w-8 place-items-center"
+            >
+              <span
+                className="block h-2 rounded-full transition-all duration-500"
+                style={{
+                  width: on ? 26 : 8,
+                  background: on ? color : "rgba(31,26,23,.2)",
+                }}
+              />
+            </button>
+          );
+        })}
       </div>
 
       {/* progress */}

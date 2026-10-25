@@ -38,3 +38,11 @@ npm run build && npm start   # production
 - Hero entrance is pure CSS, so the headline paints without waiting for JS.
 - Fonts are self-hosted via Fontsource (no third-party font request).
 - Motion respects `prefers-reduced-motion`; touch devices keep native scrolling.
+
+## Orders via Messenger
+
+The order drawer collects the pack, name, phone and an optional note, copies a
+formatted order message to the clipboard and opens `https://m.me/<username>`.
+Messenger can't be pre-filled from a link, so the customer pastes and sends.
+Set `NEXT_PUBLIC_MESSENGER_USERNAME` (the page username) in `.env.local` and in
+your Vercel project settings.

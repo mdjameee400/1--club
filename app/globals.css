@@ -151,6 +151,37 @@ body::before {
   animation-play-state: paused;
 }
 
+@keyframes pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.pop {
+  animation: pop 0.45s var(--ease-out);
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.7) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1) rotate(45deg);
+  }
+}
+.twinkle {
+  animation: twinkle var(--d, 4s) ease-in-out infinite;
+  animation-delay: var(--dl, 0s);
+}
+
 @keyframes nudge {
   0%,
   100% {

@@ -1,48 +1,69 @@
-# The 1% Club
+<div align="center">
 
-Luxury single-page site for The 1% Club: five bottled drinks, built with
-Next.js (App Router), Tailwind CSS, GSAP ScrollTrigger and Lenis.
+# THE 1% CLUB
 
-## Run it
+### It starts with what we put in.
 
-```bash
-npm install
-cp .env.example .env.local   # optional: WhatsApp number, socials, site URL
-npm run dev                  # http://localhost:3000
-npm run build && npm start   # production
-```
+*Naturally refreshing. Naturally nourishing.*
 
-## Structure
+**[Visit the website](https://onepercentclub-delta.vercel.app/)** · **[Instagram @theonepercentclubbb](https://www.instagram.com/theonepercentclubbb)**
 
-| Path | What it does |
-| --- | --- |
-| `data/flavors.ts` | The five drinks: copy, colours, ingredients, **placeholder prices** |
-| `components/Bottle.tsx` | Pure-SVG bottle + arched label, themed per flavor (no image files) |
-| `components/SmoothScroll.tsx` | Lenis, driven by GSAP's ticker so it stays in sync with ScrollTrigger |
-| `components/RevealController.tsx` | Fade-up reveals and the scrubbed story text |
-| `components/Hero.tsx` | CSS entrance (instant paint) + cursor and scroll parallax |
-| `components/Showcase.tsx` | Pinned horizontal scroll on desktop, snap carousel on touch, tint follows the active bottle |
-| `components/OrderDrawer.tsx`, `PackProvider.tsx` | Build-your-pack drawer (4 / 6 / 12 bottles) |
+</div>
 
-## Before launch
+---
 
-- Replace the placeholder prices in `data/flavors.ts`.
-- Set `NEXT_PUBLIC_ORDER_WHATSAPP` so "Send preorder" opens WhatsApp with the order pre-filled. Without it, the button copies the order summary.
-- Wire up `components/Newsletter.tsx` to an email provider (it is UI-only).
-- Review the tasting notes and craft copy; they are draft wording.
-- Add social URLs in `.env.local`.
+## From our kitchen to your hand.
 
-## Performance notes
+The 1% Club makes five small-batch bottled drinks from short, honest recipes.
+Real fruit, fresh cane, coffee, coconut and cold milk. If it isn't on the label,
+it isn't in the bottle.
 
-- Bottles are inline SVG: zero image requests, no layout shift.
-- Hero entrance is pure CSS, so the headline paints without waiting for JS.
-- Fonts are self-hosted via Fontsource (no third-party font request).
-- Motion respects `prefers-reduced-motion`; touch devices keep native scrolling.
+No long ingredient lists. No mystery. Just five drinks worth picking from.
 
-## Orders via Messenger
+## Five drinks. Five simple recipes.
 
-The order drawer collects the pack, name, phone and an optional note, copies a
-formatted order message to the clipboard and opens `https://m.me/<username>`.
-Messenger can't be pre-filled from a link, so the customer pastes and sends.
-Set `NEXT_PUBLIC_MESSENGER_USERNAME` (the page username) in `.env.local` and in
-your Vercel project settings.
+| No. | Drink | What it is | What's inside |
+| :-: | --- | --- | --- |
+| **01** | **Sugarcane Splash** | Sugarcane juice. *Straight from the cane.* | sugarcane |
+| **02** | **Coconut Milkshake** | Tropical. Creamy. Chill. | coconut water · coconut jelly · milk · sugar |
+| **03** | **Coco Blast** | Cold coffee. *Cold coffee, turned up.* | coffee powder · coconut jelly · coconut water · milk · sugar |
+| **04** | **Banana Breeze** | Banana milkshake. *Good mood inside.* | banana · milk · almonds · dates · sugar |
+| **05** | **Mango Milkshake** | *Summer in a bottle.* | mango · milk · sugar |
+
+Every bottle carries its own number, its own colour and its recipe on the label.
+
+## Why the 1%?
+
+Because the best things are made by choosing carefully. We keep the list short,
+the bottle clear and the flavour honest, so every sip tastes like what it is.
+
+- **Short recipes.** One to five ingredients per bottle.
+- **Made in our kitchen.** Handed straight to you.
+- **Five drinks, one standard.** Every flavour earns its place on the shelf.
+- **Packaging with taste.** A clear bottle and a single arched label. Nothing extra.
+
+## Pick your 1%.
+
+Our second preorder batch is open. Build a pack of **4, 6 or 12 bottles** on the
+website, add your details and send your order to us on Messenger. We'll take it
+from there.
+
+**[Build your pack →](https://onepercentclub-delta.vercel.app/)**
+
+## Find us
+
+- Website: [onepercentclub-delta.vercel.app](https://onepercentclub-delta.vercel.app/)
+- Instagram: [@theonepercentclubbb](https://www.instagram.com/theonepercentclubbb)
+- Orders & questions: message us on Messenger
+
+---
+
+<div align="center">
+
+Born at **LENS-E UTHSOB 2.0**
+
+*naturally refreshing. naturally nourishing.*
+
+© The 1% Club
+
+</div>

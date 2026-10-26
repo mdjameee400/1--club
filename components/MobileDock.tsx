@@ -20,7 +20,8 @@ export default function MobileDock() {
   }, []);
 
   const visible = shown && !open;
-  const pct = Math.min(100, (total / size) * 100);
+  const safeSize = Number.isFinite(size) && size > 0 ? size : 6;
+  const pct = safeSize > 0 ? Math.min(100, Math.max(0, (total / safeSize) * 100)) : 0;
 
   return (
     <div

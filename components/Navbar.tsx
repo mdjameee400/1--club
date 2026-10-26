@@ -9,9 +9,9 @@ import { SocialLinks } from "./Social";
 
 const links = [
   { href: "#flavors", label: "Flavors" },
+  { href: "#arcade", label: "Arcade" },
   { href: "#story", label: "Story" },
   { href: "#craft", label: "Craft" },
-  { href: "#ingredients", label: "Ingredients" },
 ];
 
 export default function Navbar() {

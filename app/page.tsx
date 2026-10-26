@@ -2,6 +2,8 @@ import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import Marquee from "@/components/Marquee";
 import Showcase from "@/components/Showcase";
+
+import GameSection from "@/components/GameSection";
 import Story from "@/components/Story";
 import Craft from "@/components/Craft";
 import Recipes from "@/components/Recipes";
@@ -16,6 +18,8 @@ export default function Home() {
         <Hero />
         <Marquee />
         <Showcase />
+
+        <GameSection />
         <Story />
         <Craft />
         <Recipes />

@@ -1,108 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import { Sparkles, Trophy, RotateCw, Check, Copy, Gift } from "lucide-react";
+import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react";
+import { Sparkles, RotateCw, Gift, ChevronRight } from "lucide-react";
 import { flavors } from "@/data/flavors";
+import Bottle from "./Bottle";
 import { usePack } from "./PackProvider";
 
-// ─── Wheel slices ───────────────────────────────────────────────
-type WheelSlice = {
-  id: string;
-  label: string;
-  sub: string;
-  color: string;
-  textColor: string;
-  isWin: boolean;
-  prizeType: "drink" | "discount" | "perk" | "none";
-  flavorId?: string;
-  code?: string;
-};
-
-const WHEEL_SLICES: WheelSlice[] = [
-  {
-    id: "slice-1",
-    label: "Coconut Shake",
-    sub: "FREE BOTTLE",
-    color: "#DDECEA",
-    textColor: "#1F1A17",
-    isWin: true,
-    prizeType: "drink",
-    flavorId: "coconut-milkshake",
-  },
-  {
-    id: "slice-2",
-    label: "15% VIP Off",
-    sub: "PROMO CODE",
-    color: "#D9922E",
-    textColor: "#FFFFFF",
-    isWin: true,
-    prizeType: "discount",
-    code: "VIP15",
-  },
-  {
-    id: "slice-3",
-    label: "Mango Shake",
-    sub: "FREE BOTTLE",
-    color: "#F9E3BE",
-    textColor: "#1F1A17",
-    isWin: true,
-    prizeType: "drink",
-    flavorId: "mango-milkshake",
-  },
-  {
-    id: "slice-4",
-    label: "Better Luck",
-    sub: "NEXT SIP",
-    color: "#1F1A17",
-    textColor: "#F9F6F0",
-    isWin: false,
-    prizeType: "none",
-  },
-  {
-    id: "slice-5",
-    label: "Coco Blast",
-    sub: "FREE BOTTLE",
-    color: "#E8DCD0",
-    textColor: "#1F1A17",
-    isWin: true,
-    prizeType: "drink",
-    flavorId: "coco-blast",
-  },
-  {
-    id: "slice-6",
-    label: "Free 6th Bottle",
-    sub: "ON 5-PACK",
-    color: "#1E4D3A",
-    textColor: "#FFFFFF",
-    isWin: true,
-    prizeType: "perk",
-    code: "SIXTHFREE",
-  },
-  {
-    id: "slice-7",
-    label: "Banana Breeze",
-    sub: "FREE BOTTLE",
-    color: "#F4EEC8",
-    textColor: "#1F1A17",
-    isWin: true,
-    prizeType: "drink",
-    flavorId: "banana-breeze",
-  },
-  {
-    id: "slice-8",
-    label: "Sugarcane",
-    sub: "FREE BOTTLE",
-    color: "#E9F0DA",
-    textColor: "#1F1A17",
-    isWin: true,
-    prizeType: "drink",
-    flavorId: "sugarcane-splash",
-  },
-];
+// ─── Types & Constants ─────────────────────────────────────────
+const TOTAL_DRINKS = flavors.length; // 5
+const SPIN_DURATION_MS = 5000; // 5 seconds
+const SPIN_EASING = "cubic-bezier(0.2, 0.8, 0.15, 1)";
 
 // ─── Web Audio Sound Helpers ────────────────────────────────────
-// All sounds are synthesized via the Web Audio API — no external files needed.
-
 let audioCtx: AudioContext | null = null;
 
 function getAudioCtx(): AudioContext {
@@ -115,7 +24,6 @@ function getAudioCtx(): AudioContext {
   return audioCtx;
 }
 
-/** Short click/tick sound as the wheel passes each slice boundary */
 function playTick() {
   try {
     const ctx = getAudioCtx();
@@ -130,15 +38,14 @@ function playTick() {
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.06);
   } catch {
-    // Silently fail if audio is unavailable
+    /* silent */
   }
 }
 
-/** Bright celebratory chime when a prize is won */
 function playWinChime() {
   try {
     const ctx = getAudioCtx();
-    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+    const notes = [523.25, 659.25, 783.99, 1046.5];
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -152,27 +59,7 @@ function playWinChime() {
       osc.stop(ctx.currentTime + i * 0.12 + 0.5);
     });
   } catch {
-    // Silently fail
-  }
-}
-
-/** Descending "wah wah" for "Better Luck" */
-function playLoseSound() {
-  try {
-    const ctx = getAudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(400, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.6);
-    gain.gain.setValueAtTime(0.12, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.7);
-  } catch {
-    // Silently fail
+    /* silent */
   }
 }
 
@@ -183,31 +70,30 @@ export default function GameSection() {
 
   const [spinning, setSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
-  const [wonPrize, setWonPrize] = useState<WheelSlice | null>(null);
-  const [spinsLeft, setSpinsLeft] = useState(2);
-  const [copiedCode, setCopiedCode] = useState(false);
+  const [wonIndex, setWonIndex] = useState<number | null>(null);
+  const [spinsLeft, setSpinsLeft] = useState(3);
+  const [showResult, setShowResult] = useState(false);
+  const [pulseArrow, setPulseArrow] = useState(true);
 
   // Confetti canvas
   const confettiCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Ref to track rotation for tick sounds
+  // Tick engine refs
   const lastTickAngle = useRef(0);
   const animFrameRef = useRef(0);
-  const wheelDivRef = useRef<HTMLDivElement>(null);
+  const wheelRef = useRef<HTMLDivElement>(null);
 
-  // Tick sound engine: reads the current CSS rotation and plays a tick each time a slice boundary is crossed
+  // Tick sound engine
   const startTickEngine = useCallback(() => {
-    const sliceAngle = 360 / WHEEL_SLICES.length;
+    const sliceAngle = 360 / TOTAL_DRINKS;
     lastTickAngle.current = rotation;
 
     const tick = () => {
-      const div = wheelDivRef.current;
+      const div = wheelRef.current;
       if (!div) return;
-      // Read the computed rotation from the element's transform style
       const style = window.getComputedStyle(div);
       const matrix = style.transform;
       if (matrix && matrix !== "none") {
-        // parse rotation from matrix
         const values = matrix.split("(")[1]?.split(")")[0]?.split(",");
         if (values && values.length >= 2) {
           const a = parseFloat(values[0]);
@@ -215,7 +101,6 @@ export default function GameSection() {
           const angle = Math.round(Math.atan2(b, a) * (180 / Math.PI));
           const normalizedAngle = ((angle % 360) + 360) % 360;
           const lastNorm = ((lastTickAngle.current % 360) + 360) % 360;
-          // Check if we crossed a slice boundary
           const lastSliceIdx = Math.floor(lastNorm / sliceAngle);
           const currentSliceIdx = Math.floor(normalizedAngle / sliceAngle);
           if (currentSliceIdx !== lastSliceIdx) {
@@ -236,13 +121,12 @@ export default function GameSection() {
     }
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => stopTickEngine();
   }, [stopTickEngine]);
 
   // Confetti burst
-  const burstConfetti = () => {
+  const burstConfetti = useCallback(() => {
     const canvas = confettiCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -251,17 +135,19 @@ export default function GameSection() {
     canvas.width = canvas.parentElement?.clientWidth || 600;
     canvas.height = canvas.parentElement?.clientHeight || 600;
 
-    const colors = ["#D9922E", "#1E4D3A", "#F3B04A", "#6FB5B3", "#E2DED5", "#4A352B"];
-    const particles = Array.from({ length: 90 }, () => ({
+    const colors = ["#D9922E", "#1E4D3A", "#F3B04A", "#6FB5B3", "#E2DED5", "#4A352B", "#CF7D14", "#5E7F4E"];
+    const particles = Array.from({ length: 120 }, () => ({
       x: canvas.width / 2,
       y: canvas.height / 2,
-      vx: (Math.random() - 0.5) * 16,
-      vy: (Math.random() - 0.5) * 16 - 4,
-      size: Math.random() * 8 + 4,
+      vx: (Math.random() - 0.5) * 18,
+      vy: (Math.random() - 0.5) * 18 - 5,
+      size: Math.random() * 8 + 3,
       color: colors[Math.floor(Math.random() * colors.length)],
       alpha: 1,
-      decay: Math.random() * 0.015 + 0.01,
+      decay: Math.random() * 0.012 + 0.008,
       rotation: Math.random() * 360,
+      rotV: (Math.random() - 0.5) * 8,
+      shape: Math.random() > 0.5 ? "rect" : "circle",
     }));
 
     const render = () => {
@@ -272,322 +158,446 @@ export default function GameSection() {
           alive = true;
           p.x += p.vx;
           p.y += p.vy;
-          p.vy += 0.25;
+          p.vy += 0.22;
+          p.vx *= 0.99;
           p.alpha -= p.decay;
+          p.rotation += p.rotV;
           ctx.save();
           ctx.globalAlpha = Math.max(0, p.alpha);
           ctx.translate(p.x, p.y);
           ctx.rotate((p.rotation * Math.PI) / 180);
           ctx.fillStyle = p.color;
-          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+          if (p.shape === "rect") {
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+          } else {
+            ctx.beginPath();
+            ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
           ctx.restore();
         }
       });
-      if (alive) {
-        requestAnimationFrame(render);
-      }
+      if (alive) requestAnimationFrame(render);
     };
     render();
-  };
+  }, []);
 
-  const spinWheel = () => {
+  const spinWheel = useCallback(() => {
     if (spinning || spinsLeft <= 0) return;
     setSpinning(true);
-    setWonPrize(null);
-    setCopiedCode(false);
+    setWonIndex(null);
+    setShowResult(false);
+    setPulseArrow(false);
 
-    // Init audio context on user gesture (required by browsers)
     getAudioCtx();
 
-    // Pick a winning index: bias towards actual prizes
-    const winningIndices = [0, 1, 2, 4, 5, 6, 7];
-    const targetIndex = winningIndices[Math.floor(Math.random() * winningIndices.length)];
-    const sliceAngle = 360 / WHEEL_SLICES.length;
+    // Pick a random winning drink
+    const targetIndex = Math.floor(Math.random() * TOTAL_DRINKS);
+    const sliceAngle = 360 / TOTAL_DRINKS;
 
+    // The arrow is fixed at the top (12 o'clock, 0 deg)
+    // Slice i center is at: i * sliceAngle + sliceAngle / 2
+    // For slice i center to arrive at 0 deg, wheel remainder must equal (360 - center) % 360
     const targetSliceCenter = targetIndex * sliceAngle + sliceAngle / 2;
-    const extraSpins = 360 * (5 + Math.floor(Math.random() * 3));
-    const finalAngle = extraSpins + (360 - targetSliceCenter) + 270;
+    const desiredRemainder = (360 - targetSliceCenter) % 360;
 
-    setRotation((prev) => prev + finalAngle);
+    // Smooth forward clockwise rotation from current rotation
+    const currentRemainder = ((rotation % 360) + 360) % 360;
+    let forwardDelta = (desiredRemainder - currentRemainder + 360) % 360;
+    if (forwardDelta < 40) {
+      forwardDelta += 360;
+    }
 
-    // Start tick sounds
-    // Slight delay so the CSS transition kicks in first
+    // 8 full spins = 2880 degrees of thrilling spin action over 5 seconds
+    const fullSpins = 360 * 8;
+    const nextRotation = rotation + fullSpins + forwardDelta;
+
+    setRotation(nextRotation);
+
     setTimeout(() => startTickEngine(), 50);
 
     setTimeout(() => {
       stopTickEngine();
       setSpinning(false);
       setSpinsLeft((s) => Math.max(0, s - 1));
-      const prize = WHEEL_SLICES[targetIndex];
-      setWonPrize(prize);
-
-      // Play win or lose sound
-      if (prize.isWin) {
-        playWinChime();
-      } else {
-        playLoseSound();
-      }
-
+      setWonIndex(targetIndex);
+      setShowResult(true);
+      playWinChime();
       burstConfetti();
-    }, 4500);
-  };
+    }, SPIN_DURATION_MS);
+  }, [spinning, spinsLeft, rotation, startTickEngine, stopTickEngine, burstConfetti]);
 
-  const claimDrinkPrize = (flavorId: string) => {
-    add(flavorId);
-    openDrawer();
-  };
+  const claimPrize = useCallback(
+    (flavorId: string) => {
+      add(flavorId);
+      openDrawer();
+    },
+    [add, openDrawer],
+  );
 
-  const copyPromoCode = (code: string) => {
-    navigator.clipboard?.writeText(code);
-    setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 3000);
-  };
+  const wonFlavor = wonIndex !== null ? flavors[wonIndex] : null;
 
   return (
-    <section id="arcade" className="relative overflow-hidden bg-cream py-24 sm:py-32">
-      {/* Confetti celebration canvas */}
+    <section id="arcade" className="relative overflow-hidden bg-[#0F0D0B] py-20 sm:py-28 lg:py-32">
+      {/* Confetti canvas */}
       <canvas
         ref={confettiCanvasRef}
         className="pointer-events-none absolute inset-0 z-50 h-full w-full"
       />
 
-      <div className="relative mx-auto max-w-6xl px-5 sm:px-8">
+      {/* Ambient glow effects */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute left-1/2 top-0 h-[600px] w-[900px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-[radial-gradient(ellipse,rgba(217,146,46,0.08)_0%,transparent_70%)]" />
+        <div className="absolute bottom-0 left-0 h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle,rgba(30,77,58,0.1)_0%,transparent_70%)]" />
+        <div className="absolute bottom-0 right-0 h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle,rgba(207,125,20,0.06)_0%,transparent_70%)]" />
+      </div>
+
+      <div className="relative z-10 mx-auto max-w-6xl px-5 sm:px-8">
         {/* Header */}
-        <div className="mx-auto max-w-3xl text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-sand/60 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-luxe text-ink">
-            <Sparkles size={14} className="text-gold" /> The 1% Club Lucky Spin
+        <div className="mx-auto max-w-2xl text-center">
+          <div className="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-luxe text-gold">
+            <Sparkles size={14} /> Spin & Win
           </div>
-          <h2 className="mt-4 font-serif text-4xl font-medium uppercase leading-[1.05] tracking-[0.03em] sm:text-5xl lg:text-6xl text-ink">
-            Spin &amp; <br />
-            <em className="font-medium normal-case italic text-forest">Taste Your Luck.</em>
+          <h2 className="mt-5 font-serif text-4xl font-medium uppercase leading-[1.05] tracking-[0.03em] text-cream sm:text-5xl lg:text-6xl">
+            Spin the wheel.
+            <br />
+            <em className="font-medium normal-case italic text-gold">Win your drink.</em>
           </h2>
-          <p className="mt-4 text-[15px] leading-relaxed text-ink/70 sm:text-base">
-            Win a complimentary 1% Club drink or unlock exclusive VIP discounts for your preorder pack.
+          <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed text-cream/50">
+            Every spin lands on one of our five signature drinks. Claim it free with your preorder pack.
           </p>
         </div>
 
-        {/* THE 1% LUCKY SPIN WHEEL */}
-        <div className="mt-12 rounded-3xl border border-ink/10 bg-sand/25 p-6 shadow-sm sm:p-10 lg:p-12 animate-in fade-in">
-          <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-14">
-            {/* Wheel Graphic */}
-            <div className="relative mx-auto flex flex-col items-center justify-center lg:col-span-6">
-              {/* Pointer indicator */}
-              <div className="absolute -top-3 left-1/2 z-30 -translate-x-1/2">
-                <div className="h-0 w-0 border-x-[14px] border-t-[24px] border-x-transparent border-t-gold drop-shadow-md" />
+        {/* Wheel + Result layout */}
+        <div className="mt-14 grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
+          {/* WHEEL COLUMN */}
+          <div className="relative flex flex-col items-center lg:col-span-7">
+            {/* The Wheel Container */}
+            <div className="relative">
+              {/* Fixed Arrow Pointer at Top */}
+              <div className="absolute -top-5 left-1/2 z-30 -translate-x-1/2 sm:-top-6">
+                <div
+                  className={`relative flex flex-col items-center transition-transform duration-300 ${
+                    spinning ? "peg-spinning" : pulseArrow ? "scale-105" : "scale-100"
+                  }`}
+                >
+                  {/* Arrow triangle */}
+                  <div
+                    className="h-0 w-0 drop-shadow-[0_4px_14px_rgba(217,146,46,0.6)]"
+                    style={{
+                      borderLeft: "16px solid transparent",
+                      borderRight: "16px solid transparent",
+                      borderTop: "28px solid #D9922E",
+                      filter: "drop-shadow(0 2px 6px rgba(217,146,46,0.4))",
+                    }}
+                  />
+                  {/* Small glow circle */}
+                  <div className="absolute -top-1 h-3 w-3 rounded-full bg-gold/90 blur-sm" />
+                </div>
               </div>
 
-              {/* The Rotating Wheel */}
-              <div className="relative h-[320px] w-[320px] sm:h-[400px] sm:w-[400px]">
+              {/* Outer decorative ring */}
+              <div className="relative mx-auto h-[300px] w-[300px] sm:h-[380px] sm:w-[380px] md:h-[420px] md:w-[420px]">
+                {/* Outer gold ring glow */}
+                <div className="absolute inset-0 rounded-full bg-gradient-to-b from-gold/20 to-gold/5 p-[3px]">
+                  <div className="h-full w-full rounded-full bg-[#0F0D0B]" />
+                </div>
+
+                {/* Tick marks around the wheel */}
+                <svg className="absolute inset-0 h-full w-full" viewBox="0 0 420 420">
+                  {Array.from({ length: 60 }).map((_, i) => {
+                    const angle = (i * 6 * Math.PI) / 180;
+                    const isMajor = i % 12 === 0;
+                    const outerR = 208;
+                    const innerR = isMajor ? 198 : 202;
+                    return (
+                      <line
+                        key={i}
+                        x1={210 + outerR * Math.cos(angle)}
+                        y1={210 + outerR * Math.sin(angle)}
+                        x2={210 + innerR * Math.cos(angle)}
+                        y2={210 + innerR * Math.sin(angle)}
+                        stroke={isMajor ? "#D9922E" : "rgba(217,146,46,0.25)"}
+                        strokeWidth={isMajor ? 2 : 1}
+                        strokeLinecap="round"
+                      />
+                    );
+                  })}
+                </svg>
+
+                {/* The spinning wheel */}
                 <div
-                  ref={wheelDivRef}
-                  className="relative h-full w-full rounded-full border-[8px] border-gold/40 shadow-2xl overflow-hidden transition-transform ease-[cubic-bezier(0.15,0.9,0.25,1)]"
+                  ref={wheelRef}
+                  className="absolute inset-[10px] rounded-full sm:inset-[12px]"
                   style={{
                     transform: `rotate(${rotation}deg)`,
-                    transitionDuration: spinning ? "4500ms" : "0ms",
+                    transition: spinning
+                      ? `transform ${SPIN_DURATION_MS}ms ${SPIN_EASING}`
+                      : "transform 400ms ease-out",
                   }}
                 >
-                  {/* SVG Wheel Slices */}
-                  <svg viewBox="0 0 400 400" className="h-full w-full">
-                    {WHEEL_SLICES.map((slice, i) => {
-                      const total = WHEEL_SLICES.length;
-                      const angle = 360 / total;
-                      const startAngle = (i * angle * Math.PI) / 180;
-                      const endAngle = ((i + 1) * angle * Math.PI) / 180;
+                  {/* SVG pie slices background */}
+                  <svg className="absolute inset-0 h-full w-full" viewBox="0 0 400 400">
+                    {flavors.map((f, i) => {
+                      const angle = 360 / TOTAL_DRINKS;
+                      const startAngle = (i * angle * Math.PI) / 180 - Math.PI / 2;
+                      const endAngle = ((i + 1) * angle * Math.PI) / 180 - Math.PI / 2;
+                      const r = 200;
+                      const cx = 200;
+                      const cy = 200;
 
-                      const x1 = 200 + 195 * Math.cos(startAngle);
-                      const y1 = 200 + 195 * Math.sin(startAngle);
-                      const x2 = 200 + 195 * Math.cos(endAngle);
-                      const y2 = 200 + 195 * Math.sin(endAngle);
+                      const x1 = cx + r * Math.cos(startAngle);
+                      const y1 = cy + r * Math.sin(startAngle);
+                      const x2 = cx + r * Math.cos(endAngle);
+                      const y2 = cy + r * Math.sin(endAngle);
 
-                      const midAngle = ((i + 0.5) * angle * Math.PI) / 180;
-                      const textRadius = 135;
-                      const tx = 200 + textRadius * Math.cos(midAngle);
-                      const ty = 200 + textRadius * Math.sin(midAngle);
-                      const deg = (i + 0.5) * angle + 90;
+                      const largeArc = angle > 180 ? 1 : 0;
 
                       return (
-                        <g key={slice.id}>
+                        <g key={f.id}>
                           <path
-                            d={`M 200 200 L ${x1} ${y1} A 195 195 0 0 1 ${x2} ${y2} Z`}
-                            fill={slice.color}
-                            stroke="#D4AF37"
-                            strokeWidth="1.5"
+                            d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`}
+                            fill={f.tint}
+                            stroke="rgba(31,26,23,0.15)"
+                            strokeWidth="1"
                           />
-                          <text
-                            x={tx}
-                            y={ty}
-                            fill={slice.textColor}
-                            fontSize="11"
-                            fontWeight="bold"
-                            fontFamily="var(--font-sans)"
-                            textAnchor="middle"
-                            dominantBaseline="central"
-                            transform={`rotate(${deg}, ${tx}, ${ty})`}
-                          >
-                            {slice.label}
-                          </text>
-                          <text
-                            x={tx}
-                            y={ty + 13}
-                            fill={slice.textColor}
-                            opacity="0.75"
-                            fontSize="8"
-                            fontWeight="600"
-                            letterSpacing="0.5"
-                            fontFamily="var(--font-sans)"
-                            textAnchor="middle"
-                            dominantBaseline="central"
-                            transform={`rotate(${deg}, ${tx}, ${ty})`}
-                          >
-                            {slice.sub}
-                          </text>
+                          {/* Inner gradient overlay for depth */}
+                          <path
+                            d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`}
+                            fill={`url(#sliceGrad${i})`}
+                            opacity="0.3"
+                          />
                         </g>
                       );
                     })}
-                    {/* Outer metallic ring */}
-                    <circle cx="200" cy="200" r="195" fill="none" stroke="#D4AF37" strokeWidth="4" />
+                    {/* Gradient defs for depth effect */}
+                    <defs>
+                      {flavors.map((f, i) => (
+                        <radialGradient key={i} id={`sliceGrad${i}`} cx="50%" cy="50%" r="50%">
+                          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor={f.accent} stopOpacity="0.15" />
+                        </radialGradient>
+                      ))}
+                    </defs>
+                    {/* Divider lines */}
+                    {flavors.map((_, i) => {
+                      const angle = (i * (360 / TOTAL_DRINKS) * Math.PI) / 180 - Math.PI / 2;
+                      return (
+                        <line
+                          key={`div-${i}`}
+                          x1={200}
+                          y1={200}
+                          x2={200 + 200 * Math.cos(angle)}
+                          y2={200 + 200 * Math.sin(angle)}
+                          stroke="rgba(31,26,23,0.12)"
+                          strokeWidth="1.5"
+                        />
+                      );
+                    })}
                   </svg>
 
-                  {/* Center Knob */}
-                  <div className="absolute inset-0 m-auto flex h-20 w-20 items-center justify-center rounded-full border-4 border-gold bg-ink text-center text-cream shadow-xl">
-                    <span className="font-serif text-xs font-semibold tracking-widest text-gold uppercase">
-                      1% CLUB
+                  {/* Drink Bottles Positioned on Each Slice */}
+                  {flavors.map((f, i) => {
+                    const angle = 360 / TOTAL_DRINKS;
+                    // Position each bottle at the center of its slice
+                    const midAngle = (i * angle + angle / 2) - 90; // -90 to start from top
+                    const bottleRadius = 36; // % from center
+                    const radians = (midAngle * Math.PI) / 180;
+                    const x = 50 + bottleRadius * Math.cos(radians);
+                    const y = 50 + bottleRadius * Math.sin(radians);
+                    const isWinningBottle = !spinning && wonIndex === i;
+
+                    return (
+                      <div
+                        key={f.id}
+                        className={`absolute transition-all duration-300 ${
+                          isWinningBottle ? "z-20 drop-shadow-[0_0_18px_rgba(217,146,46,0.9)]" : "z-10"
+                        }`}
+                        style={{
+                          left: `${x}%`,
+                          top: `${y}%`,
+                          transform: `translate(-50%, -50%) rotate(${-(rotation)}deg)${
+                            isWinningBottle ? " scale(1.15)" : ""
+                          }`,
+                          transition: spinning
+                            ? `transform ${SPIN_DURATION_MS}ms ${SPIN_EASING}`
+                            : "transform 400ms ease-out",
+                          width: "20%",
+                          height: "32%",
+                        }}
+                      >
+                        <div className="flex h-full w-full flex-col items-center justify-center">
+                          <div className={`h-[70%] w-[60%] transition-transform duration-300 ${isWinningBottle ? "scale-110" : ""}`}>
+                            <Bottle
+                              flavor={f}
+                              label={false}
+                              animate={isWinningBottle}
+                              className="h-full w-full drop-shadow-md"
+                            />
+                          </div>
+                          <span
+                            className={`mt-0.5 whitespace-nowrap text-center font-serif text-[9px] leading-tight sm:text-[11px] ${
+                              isWinningBottle ? "font-bold text-gold underline underline-offset-2" : "font-semibold"
+                            }`}
+                            style={{ color: isWinningBottle ? "#D9922E" : f.accent }}
+                          >
+                            {f.no}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+
+                  {/* Center hub */}
+                  <div className="absolute inset-0 m-auto flex h-16 w-16 items-center justify-center rounded-full border-[3px] border-gold bg-[#0F0D0B] shadow-2xl sm:h-20 sm:w-20 sm:border-4">
+                    <span className="font-serif text-[9px] font-bold uppercase tracking-[0.2em] text-gold sm:text-[10px]">
+                      1% Club
                     </span>
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Spin Button */}
-              <div className="mt-8 mb-4 flex flex-col items-center gap-2 pb-6">
+            {/* Spin Button */}
+            <div className="mt-8 flex flex-col items-center gap-3">
+              <button
+                type="button"
+                onClick={spinWheel}
+                disabled={spinning || spinsLeft <= 0}
+                className="group relative overflow-hidden rounded-full bg-gradient-to-r from-gold to-[#E8A833] px-10 py-4 text-[13px] font-bold uppercase tracking-[0.2em] text-[#0F0D0B] shadow-[0_0_30px_rgba(217,146,46,0.3)] transition-all duration-500 hover:shadow-[0_0_50px_rgba(217,146,46,0.5)] active:scale-95 disabled:opacity-40 disabled:shadow-none sm:px-12 sm:py-5"
+              >
+                <span className="relative z-10 flex items-center gap-2">
+                  <RotateCw size={17} className={spinning ? "animate-spin" : ""} />
+                  {spinning ? "Spinning…" : spinsLeft > 0 ? "Spin the Wheel" : "No Spins Left"}
+                </span>
+                {/* Shimmer effect */}
+                {!spinning && spinsLeft > 0 && (
+                  <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-1000 group-hover:translate-x-full" />
+                )}
+              </button>
+              <span className="text-xs font-medium text-cream/40">
+                {spinsLeft} free spin{spinsLeft === 1 ? "" : "s"} remaining today
+              </span>
+            </div>
+          </div>
+
+          {/* RESULT / INFO COLUMN */}
+          <div className="flex flex-col justify-center lg:col-span-5">
+            {!showResult ? (
+              /* Default info card */
+              <div className="rounded-2xl border border-cream/10 bg-cream/[0.04] p-7 backdrop-blur-sm sm:p-9">
+                <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-gold">
+                  <Gift size={15} /> Member Giveaway
+                </div>
+                <h3 className="mt-4 font-serif text-2xl font-medium leading-snug text-cream sm:text-3xl">
+                  Every spin wins a<br />
+                  <span className="text-gold">signature drink.</span>
+                </h3>
+                <p className="mt-4 text-sm leading-relaxed text-cream/50">
+                  The wheel features all five of our handcrafted drinks. Give it a spin
+                  and whatever it lands on is yours — free with your preorder pack.
+                </p>
+
+                {/* Mini drink preview */}
+                <div className="mt-7 flex items-center gap-3">
+                  {flavors.map((f) => (
+                    <div
+                      key={f.id}
+                      className="flex h-14 w-10 items-center justify-center rounded-lg border border-cream/10 bg-cream/[0.06] transition-colors hover:border-gold/30 sm:h-16 sm:w-12"
+                    >
+                      <Bottle flavor={f} label={false} animate={false} className="h-10 w-6 sm:h-12 sm:w-7" />
+                    </div>
+                  ))}
+                </div>
+
+                <ul className="mt-6 space-y-2.5">
+                  {[
+                    "Instantly added to your preorder pack",
+                    "Zero purchase necessary to play",
+                    "100% natural, small-batch recipes",
+                  ].map((text) => (
+                    <li key={text} className="flex items-start gap-2.5 text-[13px] text-cream/60">
+                      <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold/60" />
+                      {text}
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-6 flex items-center gap-2 rounded-full bg-cream/[0.04] px-3 py-1.5 text-[10px] font-medium text-cream/35">
+                  🔊 Sound effects on — turn up your volume!
+                </div>
+              </div>
+            ) : wonFlavor ? (
+              /* Winner card */
+              <div className="game-result-card rounded-2xl border-2 border-gold/40 bg-gradient-to-b from-[#1A1714] to-[#0F0D0B] p-7 shadow-[0_0_60px_rgba(217,146,46,0.15)] sm:p-9">
+                <div className="inline-flex items-center gap-2 rounded-full bg-gold/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-gold">
+                  🎉 You Won!
+                </div>
+
+                <div className="mt-5 flex items-center gap-5">
+                  {/* Winning bottle display */}
+                  <div
+                    className="relative flex h-28 w-20 shrink-0 items-center justify-center rounded-xl sm:h-36 sm:w-24"
+                    style={{ background: `linear-gradient(180deg, ${wonFlavor.soft}22, transparent)` }}
+                  >
+                    <Bottle
+                      flavor={wonFlavor}
+                      label={false}
+                      animate={true}
+                      className="h-24 w-14 drop-shadow-xl sm:h-28 sm:w-16"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-cream/40">
+                      Free Bottle
+                    </p>
+                    <h3 className="mt-1 font-serif text-2xl font-bold text-cream sm:text-3xl">
+                      {wonFlavor.name}
+                    </h3>
+                    <p
+                      className="mt-1 font-serif text-lg italic"
+                      style={{ color: wonFlavor.accent }}
+                    >
+                      {wonFlavor.tagline}
+                    </p>
+                  </div>
+                </div>
+
+                <p className="mt-5 text-[13px] leading-relaxed text-cream/50">
+                  Congratulations! Your free{" "}
+                  <strong className="text-cream/70">{wonFlavor.name}</strong> is ready to be
+                  claimed. It will be added to your preorder pack instantly.
+                </p>
+
                 <button
                   type="button"
-                  onClick={spinWheel}
-                  disabled={spinning || spinsLeft <= 0}
-                  className="btn btn-dark !px-10 !py-4 shadow-xl active:scale-95 disabled:opacity-50"
+                  onClick={() => claimPrize(wonFlavor.id)}
+                  className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-gold to-[#E8A833] px-6 py-4 text-[13px] font-bold uppercase tracking-[0.15em] text-[#0F0D0B] shadow-lg transition-all duration-300 hover:shadow-[0_0_30px_rgba(217,146,46,0.4)] active:scale-[0.97]"
                 >
-                  <RotateCw size={17} className={spinning ? "animate-spin" : ""} />
-                  {spinning ? "Spinning..." : spinsLeft > 0 ? "SPIN THE WHEEL" : "Out of Spins for Today"}
+                  Claim & Add to Pack
+                  <ChevronRight size={16} />
                 </button>
-                <span className="text-xs font-semibold text-ink/60">
-                  {spinsLeft} complimentary spin{spinsLeft === 1 ? "" : "s"} remaining
-                </span>
+
+                {spinsLeft > 0 && (
+                  <button
+                    type="button"
+                    onClick={spinWheel}
+                    disabled={spinning}
+                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-cream/15 px-6 py-3 text-[12px] font-semibold uppercase tracking-wider text-cream/50 transition-colors hover:border-cream/30 hover:text-cream/70 disabled:opacity-50"
+                  >
+                    <RotateCw size={14} className={spinning ? "animate-spin" : ""} />
+                    Spin Again ({spinsLeft} left)
+                  </button>
+                )}
               </div>
-            </div>
-
-            {/* Prize & Result Card */}
-            <div className="flex flex-col justify-center lg:col-span-6">
-              {!wonPrize ? (
-                <div className="rounded-2xl border border-ink/10 bg-cream p-7 shadow-sm">
-                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-forest">
-                    <Gift size={16} /> Authentic Member Giveaway
-                  </div>
-                  <h3 className="mt-3 font-serif text-3xl font-medium text-ink">
-                    Every spin has a taste of luxury.
-                  </h3>
-                  <p className="mt-3 text-sm leading-relaxed text-ink/75">
-                    Spin to win a free bottle of our Coconut Milkshake, Mango Milkshake, Coco Blast or unlock up to 15% VIP discounts for your preorder pack.
-                  </p>
-                  <ul className="mt-5 space-y-2.5 text-xs text-ink/80">
-                    <li className="flex items-center gap-2">
-                      <Check size={14} className="text-forest" /> Instantly added to your preorder pack
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <Check size={14} className="text-forest" /> Zero purchase necessary to participate
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <Check size={14} className="text-forest" /> 100% natural small-batch kitchen recipe
-                    </li>
-                  </ul>
-
-                  {/* Sound indicator */}
-                  <div className="mt-5 flex items-center gap-2 rounded-full bg-sand/70 px-3 py-1.5 w-fit text-[10px] font-semibold text-ink/50">
-                    🔊 Sound effects enabled — make sure your volume is on!
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-2xl border-2 border-gold/60 bg-cream p-8 shadow-xl animate-in zoom-in-95 duration-500">
-                  <span className="inline-block rounded-full bg-gold/20 px-3 py-1 text-xs font-bold uppercase tracking-wider text-ink">
-                    🎉 Lucky Spin Winner
-                  </span>
-                  <h3 className="mt-3 font-serif text-3xl font-bold text-ink">
-                    {wonPrize.label}
-                  </h3>
-                  <p className="mt-2 text-sm text-forest font-medium">
-                    {wonPrize.sub}
-                  </p>
-
-                  {wonPrize.prizeType === "drink" && wonPrize.flavorId && (
-                    <div className="mt-5">
-                      <p className="text-xs text-ink/70">
-                        Congratulations! Your free bottle of <strong>{wonPrize.label}</strong> is ready to be claimed with your pack.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => claimDrinkPrize(wonPrize.flavorId!)}
-                        className="mt-4 btn btn-dark w-full !py-3.5"
-                      >
-                        Claim &amp; Add to My Pack →
-                      </button>
-                    </div>
-                  )}
-
-                  {wonPrize.prizeType === "discount" && wonPrize.code && (
-                    <div className="mt-5">
-                      <p className="text-xs text-ink/70">
-                        Use code <strong>{wonPrize.code}</strong> when ordering to receive your exclusive 15% VIP discount!
-                      </p>
-                      <div className="mt-3 flex items-center gap-2">
-                        <code className="flex-1 rounded-xl bg-sand p-3 text-center text-sm font-bold tracking-widest text-ink">
-                          {wonPrize.code}
-                        </code>
-                        <button
-                          type="button"
-                          onClick={() => copyPromoCode(wonPrize.code!)}
-                          className="btn btn-dark !py-3 !px-4"
-                        >
-                          {copiedCode ? <Check size={15} /> : <Copy size={15} />}
-                          {copiedCode ? "Copied" : "Copy"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {wonPrize.prizeType === "perk" && (
-                    <div className="mt-5">
-                      <p className="text-xs text-ink/70">
-                        Order any 5-pack and get your 6th bottle absolutely free! Mention code <strong>SIXTHFREE</strong> in your note.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={openDrawer}
-                        className="mt-4 btn btn-dark w-full !py-3.5"
-                      >
-                        Build Your 5-Pack Now →
-                      </button>
-                    </div>
-                  )}
-
-                  {wonPrize.prizeType === "none" && (
-                    <div className="mt-5">
-                      <p className="text-xs text-ink/70">
-                        So close! Refresh your energy and spin again with your next complimentary spin.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={spinWheel}
-                        disabled={spinsLeft <= 0}
-                        className="mt-4 btn btn-ghost w-full !py-3"
-                      >
-                        Spin Again ({spinsLeft} left)
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            ) : null}
           </div>
         </div>
       </div>
+
+      {/* Bottom decorative line */}
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gold/20 to-transparent" />
     </section>
   );
 }
